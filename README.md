@@ -1,5 +1,6 @@
 # FFR
 
+Test : run sbt test
 
 Usage : Run main object via sbt run or run the jar
 
