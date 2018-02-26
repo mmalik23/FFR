@@ -2,7 +2,10 @@ package ffr
 
 import org.joda.time.DateTime
 
-sealed case class EnergyRow(dateTime : DateTime,
+
+sealed trait Record
+
+sealed case class RawEnergyRecord(dateTime : DateTime,
                             frequency : Double,
                             legacy : Int,
                             legacyTwo : Int,
@@ -14,7 +17,15 @@ sealed case class EnergyRow(dateTime : DateTime,
                             legacyFive : Int,
                             legacySix : Int,
                             relayStatus : String
-                           )
+                           ) extends Record
+
+sealed case class ProcessedRecord(time : Long,
+                         frequency : Double
+                         ,totalPhase : Long
+                         , relayStatus : String
+                         , powerOutput :Option[Long]) extends Record
+
+
 
 
 

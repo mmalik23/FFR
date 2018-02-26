@@ -1,6 +1,6 @@
 package ffr
 
-import org.joda.time.DateTime
+import org.joda.time.format.DateTimeFormat
 import org.scalatest.{FlatSpecLike, Matchers}
 
 import scala.io.Source
@@ -11,45 +11,48 @@ class FFRSpec extends FlatSpecLike with Matchers {
 
   trait TestFixture {
 
-    def readResource(path: String) : Array[String] = Source.fromResource(path).getLines.toArray
+    def readResource(path: String) :List[String] = Source.fromResource(path).getLines.toList
 
-    val dateTime = DateTime.parse("2016-10-20 00:00:00:000")
+    val fmt = DateTimeFormat.forPattern("YYYY-MM-DD HH:mm:ss:SSS")
 
-    val dateTimeAsString = "2016-10-20 00:00:00:000"
+    val dateTime = fmt.parseDateTime("2016-10-20 00:00:00:000")
 
-    val goodRecord = s"#$dateTimeAsString,50.0689,0,0,0,0,1469345,1463552,1431758,0,1,off $"
-    val goodEnergyRecord = EnergyRow(
+
+
+    val goodRecord = "#2016-10-20 00:00:00:000,50.0689,0,0,0,0,1469345,1463552,1431758,0,1,off$"
+    val goodEnergyRecord = RawEnergyRecord(
       dateTime,
       "50.0689".toDouble,
       0, 0, 0, 0,
       1469345, 1463552, 1431758,
       0, 1,
-      "off$")
+      "off")
 
-    val injectedData: Array[String] = readResource("/testData/TestInjection")
+    val injectedData: List[String] = readResource("TestData/TestInjection.csv")
+
+
   }
 
 
 
   "validator" should "validate csv" in new TestFixture {
-    val badCSV = Array("terrible CSV MATE!")
+    val badCSV = List("terrible CSV MATE!")
 
-    val goodCSV = Array(goodRecord)
-    val expectedGoodRecords = Array(goodEnergyRecord)
+    val goodCSV = List(goodRecord)
+    val expectedGoodRecords = Right(List(goodEnergyRecord))
 
-    a [Exception] should be thrownBy{
-      new FFR(badCSV).parseCSV()
-    }
+    new FFR(badCSV).parseCSV().isLeft shouldBe true
 
-    new FFR(goodCSV).parseCSV() should contain theSameElementsAs expectedGoodRecords
+    new FFR(goodCSV).parseCSV() shouldBe expectedGoodRecords
 
   }
 
 
 
-  "processor" should "fail since relay switch was not hit in 400ms" in new TestFixture {
+  "processor relay" should "fail since relay switch was not hit in 400ms" in new TestFixture {
 
-    val failedToSwitchRelay = readResource("/testData/FailedToSwitchRelay.csv")
+    val failedToSwitchRelay = readResource("TestData/FailedToSwitchRelay.csv")
+
 
     val outOfBoundsRecord = Array("$2016-10-22 00:00:40:000,50.0689,0,0,0,0,1469345,1463552,1431758,0,1,off$")
 
@@ -57,37 +60,40 @@ class FFRSpec extends FlatSpecLike with Matchers {
 
     val ffr = new FFR(csv)
 
-    ffr.run() shouldBe false
+    ffr.run() shouldBe Left("Relay switch did not fire within 400ms!")
 
   }
 
-  "processor" should "fail since the power did not go down in 30 seconds!!! " in  new TestFixture {
+  "processor power down " should "fail since the power did not go down in 30 seconds!!! " in  new TestFixture {
 
-   val failedToPowerDown = readResource("/testData/FailedToPowerDown")
+   val failedToPowerDown = readResource("TestData/FailedToPowerDown.csv")
+
 
     val csv = injectedData ++ failedToPowerDown
 
-    new FFR(csv).run() shouldBe false
+    new FFR(csv).run() shouldBe Left("Did not remain powered down or did not power down fast enough")
 
   }
 
-  "processor" should "fail since the power did not remain low for 30 mins!" in new TestFixture {
+  "processor remain powered down" should "fail since the power did not remain low for 30 mins!" in new TestFixture {
 
-    val failedToKeepPowerDown = readResource("/testData/FailedToKeepPowerDown")
+    val failedToKeepPowerDown = readResource("TestData/FailedToKeepPowerDown.csv")
 
     val csv = injectedData ++ failedToKeepPowerDown
 
-    new FFR(csv).run() shouldBe false
+    new FFR(csv).run() shouldBe Left("Did not remain powered down or did not power down fast enough")
 
   }
 
-  "processer" should "succeed and meet the ffr requirements" in new TestFixture {
+  "processer success" should "succeed and meet the ffr requirements" in new TestFixture {
 
-    val success = readResource("/testData/Success.csv")
+    val success = readResource("TestData/Success.csv")
 
     val csv = injectedData ++ success
 
-    new FFR(csv).run() shouldBe true
+
+
+    new FFR(csv).run() shouldBe Right(true)
 
   }
 

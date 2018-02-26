@@ -8,7 +8,10 @@ src_managed/
 project/boot/
 .history
 .cache
+.idea/
 
+# mpeltonen/sbt-idea plugin
+.idea_modules/
 
 ### Scala ###
 *.class
